@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>Pi</title>
+    <title>Journey Through Pi</title>
     <meta content="text/html; charset=utf-8" http-equiv="content-type">
 
     <!--<link href="https://fonts.googleapis.com/css?family=Roboto rel="stylesheet type="text/css">-->
@@ -20,6 +20,15 @@
     <div id="container"></div>
     <script src="node_modules/underscore/underscore-min.js" charset="utf-8"></script>
     <script src="node_modules/phaser/build/phaser.min.js" charset="utf-8"></script>
+    <script src="https://www.gstatic.com/firebasejs/live/3.0/firebase.js"></script>
+    <script>
+      firebase.initializeApp({
+        apiKey: 'AIzaSyAbtk7MWP_hoMpAwmHNtLGYQNqKq_bs1aY',
+        authDomain: 'journey-through-pi.firebaseapp.com',
+        databaseURL: 'https://journey-through-pi.firebaseio.com',
+        storageBucket: 'journey-through-pi.appspot.com'
+      });
+    </script>
     <script src="build/index.js" charset="utf-8"></script>
   </body>
 </html>

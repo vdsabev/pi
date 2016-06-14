@@ -27,12 +27,11 @@ module Pi {
     }
 
     create() {
+      this.game.world.setBounds(0, 0, 2 * Game.width, 2 * Game.height);
+
       this.player = this.game.add.sprite(this.game.world.centerX, this.game.world.centerY, 'player');
       this.player.anchor.setTo(0.5, 0.5);
-
-      // Modify the world and camera bounds
-      this.game.world.setBounds(0, 0, Game.width, Game.height);
-      this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_PLATFORMER);
+      this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
 
       this.cursors = this.game.input.keyboard.createCursorKeys();
     }

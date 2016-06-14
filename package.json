@@ -1,0 +1,19 @@
+{
+  "name": "pi",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "phaser": "^2.4.8",
+    "underscore": "^1.8.3"
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vdsabev/pi.git"
+  },
+  "author": "Vladimir Sabev",
+  "bugs": {
+    "url": "https://github.com/vdsabev/pi/issues"
+  },
+  "homepage": "https://github.com/vdsabev/pi#readme"
+}

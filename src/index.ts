@@ -8,7 +8,7 @@ module Pi {
     static gravity = 800;
 
     static playerID = window.prompt('Enter your player ID:', '-KKFbucEljzXDLEC-49X');
-    static requestCooldown = 1000;
+    static saveCooldown = 100;
 
     game: Phaser.Game;
     cursors: Phaser.CursorKeys;
@@ -35,7 +35,7 @@ module Pi {
       // });
 
       firebase.database().ref('players').on('child_added', (playerSnapshot: any) => {
-        const player = this.addPlayer(playerSnapshot.val());
+        const player = this.addPlayer(playerSnapshot.val().position);
         if (playerSnapshot.key === Game.playerID) {
           this.player = player;
           this.player.anchor.set(0.5);
@@ -47,6 +47,11 @@ module Pi {
         }
         else {
           this.otherPlayers.push(player);
+          firebase.database()
+            .ref(`players/${playerSnapshot.key}/position`)
+            .on('child_changed', (positionSnapshot: any) => {
+              (player as any)[positionSnapshot.key] = positionSnapshot.val();
+            });
         }
       });
       
@@ -92,11 +97,11 @@ module Pi {
     update() {
       if (this.player) {
         this.game.physics.arcade.collide(this.player, this.platforms);
-        this.movePlayer();
+        this.checkPlayerActions();
       }
     }
 
-    movePlayer() {
+    checkPlayerActions() {
       let dx = 0;
       let angle = 0;
 
@@ -124,16 +129,18 @@ module Pi {
       // http://codepen.io/jackrugile/pen/fqHtn
       if (dx) {
         this.game.world.setBounds(dx, 0, this.game.world.width + dx, this.game.height);
-        this.savePlayer();
+        this.savePlayerPosition();
       }
     }
 
-    savePlayer = _.throttle(() => {
-      firebase.database().ref(`players/${Game.playerID}`).set({
-        x: this.player.x,
-        y: this.player.y
-      });
-    }, Game.requestCooldown);
+    savePlayerPosition = _.throttle(() => {
+      firebase.database()
+        .ref(`players/${Game.playerID}/position`)
+        .set({
+          x: this.player.x,
+          y: this.player.y
+        });
+    }, Game.saveCooldown);
 
     render() {
       this.game.debug.cameraInfo(this.game.camera, 32, 32);

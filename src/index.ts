@@ -4,87 +4,103 @@ module Pi {
 
   class Game {
     static playerSpeed = 10;
-    static width = window.innerWidth;
-    static height = window.innerHeight;
-
+    static playerJumpHeight = 100;
+    static gravity = 800;
+    
     game: Phaser.Game;
-    origDragPoint: { x: number, y: number };
     cursors: Phaser.CursorKeys;
     player: Phaser.Sprite;
-
-    constructor() {
-      this.game = new Phaser.Game(Game.width, Game.height, Phaser.CANVAS, 'container', {
-        preload: this.preload,
-        create: this.create,
-        update: this.update,
-        render: this.render
-      });
-    }
+    platforms: Phaser.Group;
 
     preload() {
       this.game.stage.backgroundColor = 0x000000;
+      this.game.load.image('platform', 'assets/sprites/platform.png');
       this.game.load.image('player', 'assets/sprites/player.png');
     }
 
     create() {
-      this.game.world.setBounds(0, 0, 2 * Game.width, 2 * Game.height);
-
-      this.player = this.game.add.sprite(this.game.world.centerX, this.game.world.centerY, 'player');
-      this.player.anchor.setTo(0.5, 0.5);
-      this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
+      this.game.physics.startSystem(Phaser.Physics.ARCADE);
+      this.createPlayer();
+      this.createPlatforms();
 
       this.cursors = this.game.input.keyboard.createCursorKeys();
     }
 
+    createPlayer() {
+      // Player
+      this.player = this.game.add.sprite(
+        this.game.world.centerX,
+        this.game.world.centerY - Game.playerJumpHeight,
+        'player'
+      );
+
+      this.player.scale.set(0.2);
+      this.player.anchor.set(0.5);
+      this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
+
+      // Collision setup
+      // Disable all collisions except for down
+      this.game.physics.arcade.enable(this.player);
+      this.player.body.gravity.y = Game.gravity;
+    }
+
+    createPlatforms() {
+      this.platforms = this.game.add.group();
+      this.platforms.enableBody = true;
+      this.platforms.createMultiple(10, 'platform');
+
+      // Create the base platform, with buffer on either side so that the player doesn't fall through
+      const buffer = 16;
+      this.createPlatform(-buffer, this.game.world.height - buffer, this.game.world.width + buffer);
+      
+      // Create a batch of platforms that start to move up the level
+      // for (let i = 0; i < 9; i++) {
+      //   this.createPlatform(this.game.rnd.integerInRange(0, this.game.world.width - 50), this.game.world.height - 100 - 100 * i, 50);
+      // }
+    }
+
+    createPlatform(x: number, y: number, width: number) {
+      const platform = this.platforms.getFirstDead();
+      platform.reset(x, y);
+      platform.scale.x = width;
+      platform.scale.y = 16;
+      platform.body.immovable = true;
+
+      return platform;
+    }
+
     update() {
+      this.game.physics.arcade.collide(this.player, this.platforms);
+      this.movePlayer();
+    }
+
+    movePlayer() {
       let dx = 0;
-      let dy = 0;
       let angle = 0;
 
-      var horizontalMovement = this.cursors.left.isDown || this.cursors.right.isDown; 
-      var verticalMovement = this.cursors.up.isDown || this.cursors.down.isDown; 
-      if (horizontalMovement && verticalMovement) {
-        if (this.cursors.left.isDown) {
-          dx = -Math.SQRT1_2 * Game.playerSpeed;
-          angle = -30;
-        }
-        else {
-          dx = Math.SQRT1_2 * Game.playerSpeed;
-          angle = 30;
-        }
-      
-        if (this.cursors.up.isDown) {
-          dy = -Math.SQRT1_2 * Game.playerSpeed;
-        }
-        else {
-          dy = Math.SQRT1_2 * Game.playerSpeed;
-        }
+      if (this.cursors.right.isDown) {
+        dx = Math.SQRT1_2 * Game.playerSpeed;
+        angle = 30;
       }
-      else {
-        if (horizontalMovement) {
-          if (this.cursors.left.isDown) {
-            dx = -Game.playerSpeed;
-            angle = -30;
-          }
-          else {
-            dx = Game.playerSpeed;
-            angle = 30;
-          }
-        }
-
-        if (verticalMovement) {
-          if (this.cursors.up.isDown) {
-            dy = -Game.playerSpeed;
-          }
-          else {
-            dy = Game.playerSpeed;
-          }
-        }
+      else if (this.cursors.left.isDown) {
+        dx = -Math.SQRT1_2 * Game.playerSpeed;
+        angle = -30;
       }
 
+      if (this.cursors.up.isDown && this.player.body.touching.down) {
+        this.player.body.velocity.y = Game.playerJumpHeight;
+      } 
+
+      // const newX = this.player.x + dx + (dx > 0 ? 1 : -1) * this.player.width * 0.5;
+      // if (0 <= newX && newX <= this.game.width) {
       this.player.x += dx;
-      this.player.y += dy;
+      // }
+      
       this.player.angle = angle;
+
+      // Set bounds as the player moves
+      // http://codepen.io/jackrugile/pen/fqHtn
+      this.game.world.setBounds(dx, 0, this.game.world.width + dx, this.game.height);
     }
 
     render() {
@@ -92,9 +108,7 @@ module Pi {
     }
   }
 
-  function getDigitColor(digit: number): number {
-    return 0xFFFFFF * digit / 10;
-  }
-
-  const game = new Game();
+  const game = new Phaser.Game(window.innerWidth, window.innerHeight, Phaser.CANVAS);
+  game.state.add('game', Game);
+  game.state.start('game');
 }

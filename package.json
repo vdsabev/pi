@@ -1,17 +1,42 @@
 {
-  "name": "pi",
   "private": true,
+  "name": "pi",
   "version": "1.0.0",
+  "scripts": {
+    "clean": "rimraf build",
+    "prebuild": "npm run clean -s",
+    "copy:assets": "mkdirp build && ncp assets build/assets",
+    "build": "npm run copy:assets && webpack -p",
+    "serve": "npm run build && firebase serve",
+    "start": "webpack-dev-server",
+    "deploy": "npm run build && firebase deploy",
+    "stats": "webpack --profile --json > stats.json",
+    "test": "echo \"Error: not implemented\" && exit 1"
+  },
   "dependencies": {
+    "firebase": "^3.0.5",
     "phaser": "^2.4.8",
     "underscore": "^1.8.3"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "awesome-typescript-loader": "^1.0.0",
+    "css-loader": "^0.23.1",
+    "extract-text-webpack-plugin": "^1.0.1",
+    "html-webpack-plugin": "^2.21.0",
+    "mkdirp": "^0.5.1",
+    "ncp": "^2.0.0",
+    "rimraf": "^2.5.2",
+    "script-loader": "^0.7.0",
+    "style-loader": "^0.13.1",
+    "typescript": "^1.8.10",
+    "webpack": "^1.13.1",
+    "webpack-dev-server": "^1.14.1"
+  },
+  "author": "Vladimir Sabev",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/vdsabev/pi.git"
   },
-  "author": "Vladimir Sabev",
   "bugs": {
     "url": "https://github.com/vdsabev/pi/issues"
   },

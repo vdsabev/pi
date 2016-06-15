@@ -1,15 +1,16 @@
 {
-  "compileOnSave": true,
+  "compileOnSave": false,
   "compilerOptions": {
     "experimentalDecorators": true,
+    "module": "commonjs",
     "noImplicitAny": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "outDir": "build",
     "sourceMap": true,
     "target": "ES5"
   },
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "typings"
   ]
 }

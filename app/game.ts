@@ -12,6 +12,15 @@ export class Game {
   otherPlayers: Phaser.Sprite[] = [];
   platforms: Phaser.Group;
 
+  savePlayerPosition = _.throttle(() => {
+    firebase.database()
+      .ref(`players/${Game.playerID}/position`)
+      .set({
+        x: this.player.x,
+        y: this.game.world.height - this.player.y
+      });
+  }, Game.saveCooldown);
+
   preload() {
     this.game.stage.backgroundColor = 0x000000;
     this.game.load.image('platform', 'assets/sprites/platform.png');
@@ -22,7 +31,7 @@ export class Game {
     this.cursors = this.game.input.keyboard.createCursorKeys();
     this.game.world.setBounds(0, 0, this.game.width, this.game.height);
     this.game.physics.startSystem(Phaser.Physics.ARCADE);
-    
+
     // TODO: Create player when registering
     // this.player = this.addPlayer();
     // firebase.database().ref('players').push({
@@ -50,14 +59,14 @@ export class Game {
           });
       }
     });
-    
+
     this.addPlatforms();
   }
 
   addPlayer(options: any = {}) {
     const player = this.game.add.sprite(
       options.x || this.game.world.centerX,
-      (options.y || this.game.world.centerY) - Game.playerJumpHeight,
+      this.game.world.height - options.y - Game.playerJumpHeight,
       'player'
     );
     player.scale.set(0.2);
@@ -73,7 +82,7 @@ export class Game {
     // Create the base platform, with buffer on either side so that the player doesn't fall through
     const buffer = 16;
     this.createPlatform(-buffer, this.game.world.height - buffer, this.game.world.width + buffer);
-    
+
     // Create a batch of platforms that start to move up the level
     // for (let i = 0; i < 9; i++) {
     //   this.createPlatform(this.game.rnd.integerInRange(0, this.game.world.width - 50), this.game.world.height - 100 - 100 * i, 50);
@@ -93,11 +102,11 @@ export class Game {
   update() {
     if (this.player) {
       this.game.physics.arcade.collide(this.player, this.platforms);
-      this.checkPlayerActions();
+      this.readInputCommands();
     }
   }
 
-  checkPlayerActions() {
+  readInputCommands() {
     let dx = 0;
     let angle = 0;
 
@@ -112,13 +121,13 @@ export class Game {
 
     if (this.cursors.up.isDown && this.player.body.touching.down) {
       this.player.body.velocity.y = Game.playerJumpHeight;
-    } 
+    }
 
     // const newX = this.player.x + dx + (dx > 0 ? 1 : -1) * this.player.width * 0.5;
     // if (0 <= newX && newX <= this.game.width) {
     this.player.x += dx;
     // }
-    
+
     this.player.angle = angle;
 
     // Set bounds as the player moves
@@ -128,15 +137,6 @@ export class Game {
       this.savePlayerPosition();
     }
   }
-
-  savePlayerPosition = _.throttle(() => {
-    firebase.database()
-      .ref(`players/${Game.playerID}/position`)
-      .set({
-        x: this.player.x,
-        y: this.player.y
-      });
-  }, Game.saveCooldown);
 
   render() {
     this.game.debug.cameraInfo(this.game.camera, 32, 32);

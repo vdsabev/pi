@@ -1,15 +1,16 @@
 import { piDigits } from './pi';
 
 export class Game {
-  static playerSpeed = 10;
-  static playerJumpHeight = 100;
+  static playerMoveSpeed = 1000;
+  static playerJumpSpeed = 800;
   static gravity = 1000;
 
   static playerID = window.prompt('Enter your player ID:', '-KKFbucEljzXDLEC-49X');
   static saveCooldown = 100;
 
   game: Phaser.Game;
-  cursors: Phaser.CursorKeys;
+  initialWidth: number;
+  initialHeight: number;
   player: Phaser.Sprite;
   otherPlayers: Phaser.Sprite[] = [];
   platforms: Phaser.Group;
@@ -19,7 +20,7 @@ export class Game {
       .ref(`players/${Game.playerID}/position`)
       .set({
         x: this.player.x,
-        y: this.game.world.height - this.player.y
+        y: this.game.height - this.player.y
       });
   }, Game.saveCooldown);
 
@@ -30,10 +31,8 @@ export class Game {
   }
 
   create() {
-    this.cursors = this.game.input.keyboard.createCursorKeys();
     this.game.world.setBounds(0, 0, this.game.width, this.game.height);
     this.game.physics.startSystem(Phaser.Physics.ARCADE);
-
     this.addPlatforms();
 
     // TODO: Create player when registering
@@ -43,25 +42,25 @@ export class Game {
     //   y: this.player.y
     // });
 
-    // const player = this.addPlayer({ x: 0, y: 0 });
-    // this.player = player;
-    // this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
+    this.player = this.addPlayer(this.game.world.centerX, this.game.world.centerY);
+    this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
 
-    firebase.database().ref('players').on('child_added', (playerSnapshot: any) => {
-      const player = this.addPlayer(playerSnapshot.val().position);
-      if (playerSnapshot.key === Game.playerID) {
-        this.player = player;
-        this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
-      }
-      else {
-        this.otherPlayers.push(player);
-        firebase.database()
-          .ref(`players/${playerSnapshot.key}/position`)
-          .on('child_changed', (positionSnapshot: any) => {
-            (player as any)[positionSnapshot.key] = positionSnapshot.val();
-          });
-      }
-    });
+    // firebase.database().ref('players').on('child_added', (playerSnapshot: any) => {
+    //   const position = playerSnapshot.val().position;
+    //   const player = this.addPlayer(position.x, position.y);
+    //   if (playerSnapshot.key === Game.playerID) {
+    //     this.player = player;
+    //     this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
+    //   }
+    //   else {
+    //     this.otherPlayers.push(player);
+    //     firebase.database()
+    //       .ref(`players/${playerSnapshot.key}/position`)
+    //       .on('child_changed', (positionSnapshot: any) => {
+    //         (player as any)[positionSnapshot.key] = positionSnapshot.val();
+    //       });
+    //   }
+    // });
   }
 
   addPlatforms() {
@@ -69,32 +68,30 @@ export class Game {
     this.platforms.enableBody = true;
     this.platforms.createMultiple(100, 'platform');
 
-    const platformWidth = this.game.world.width * 0.1;
-    const platformHeight = this.game.world.height * 0.075;
+    const platformWidth = this.game.width * 0.1;
+    const platformHeight = this.game.height * 0.075;
 
     // Create left wall
     this.addPlatform(
       0, 0,
-      platformHeight, this.game.world.height
+      platformHeight, this.game.height
     );
 
     // Create floor
     this.addPlatform(
-      0, this.game.world.height - platformHeight,
-      this.game.world.width, platformHeight
+      0, this.game.height - platformHeight,
+      this.game.width,
+      platformHeight
     );
 
     // Create ceiling
-    this.addPlatform(
-      0, 0,
-      100 * this.game.world.width, platformHeight
-    );
+    this.addPlatform(0, 0, 10 * this.game.width, platformHeight);
 
     // Create digits
     _(100).times((index) => {
       const offsetDigit = piDigits[index] + 1;
       this.addPlatform(
-        this.game.world.width + index * platformWidth, this.game.world.height - offsetDigit * platformHeight,
+        this.game.width + index * platformWidth, this.game.height - offsetDigit * platformHeight,
         platformWidth, offsetDigit * platformHeight
       );
     });
@@ -102,6 +99,8 @@ export class Game {
 
   addPlatform(x: number, y: number, width: number, height: number) {
     const platform = this.platforms.getFirstDead();
+    if (!platform) return;
+
     platform.reset(x, y);
     platform.scale.x = width;
     platform.scale.y = height;
@@ -110,13 +109,9 @@ export class Game {
     return platform;
   }
 
-  addPlayer(options: any = {}) {
-    const player = this.game.add.sprite(
-      options.x || this.game.world.centerX,
-      this.game.world.height - options.y - Game.playerJumpHeight,
-      'player'
-    );
-    player.scale.set(0.2);
+  addPlayer(x = 0, y = 0) {
+    const player = this.game.add.sprite(x, this.game.height - y, 'player');
+    player.scale.set(this.game.height * 0.1 / player.height);
     player.anchor.set(0.5);
 
     this.game.physics.arcade.enable(player);
@@ -138,25 +133,31 @@ export class Game {
   }
 
   readInputCommands() {
-    let dx = 0;
-
-    if (this.cursors.up.isDown) {
-      this.player.y -= Game.playerSpeed;
+    if (this.game.input.keyboard.isDown(Phaser.Keyboard.A)) {
+      this.player.body.velocity.x = -Game.playerMoveSpeed;
+    }
+    else if (this.game.input.keyboard.isDown(Phaser.Keyboard.D)) {
+      this.player.body.velocity.x = Game.playerMoveSpeed;
+    }
+    else {
+      this.player.body.velocity.x = 0;
     }
 
-    if (this.cursors.right.isDown) {
-      dx = Game.playerSpeed;
+    if (this.game.input.keyboard.isDown(Phaser.Keyboard.SPACEBAR) && this.player.body.touching.down) {
+      this.player.body.velocity.y = -Game.playerJumpSpeed;
     }
-    else if (this.cursors.left.isDown) {
-      dx = -Game.playerSpeed;
-    }
-
-    this.player.x += dx;
 
     // Set bounds as the player moves
     // http://codepen.io/jackrugile/pen/fqHtn
-    if (dx) {
-      this.game.world.setBounds(dx, 0, this.game.world.width + dx, this.game.height);
+    const playerIsMoving = (
+      this.player.body.velocity.x &&
+      !(this.player.body.touching.left || this.player.body.touching.right)
+    );
+    if (playerIsMoving) {
+      this.game.world.setBounds(
+        0, 0,
+        this.player.x + this.game.width * 0.5, this.game.height
+      );
       this.savePlayerPosition();
     }
   }

@@ -4,6 +4,11 @@ import { Player } from './player';
 export class Game {
   static playerID = window.prompt('Enter your player ID:', '-KKFbucEljzXDLEC-49X');
   static saveCooldown = 100;
+  static controls = {
+    jump: Phaser.Keyboard.SPACEBAR,
+    left: Phaser.Keyboard.A,
+    right: Phaser.Keyboard.D
+  };
 
   game: Phaser.Game;
   initialWidth: number;
@@ -35,13 +40,15 @@ export class Game {
     this.addPlatforms();
 
     // TODO: Create player when registering
-    // this.player = this.addPlayer();
+    // this.player = this.addPlayer(this.game.world.centerX, this.game.world.centerY);
     // firebase.database().ref('players').push({
-    //   x: this.player.x,
-    //   y: this.player.y
+    //   position: {
+    //     x: this.player.x,
+    //     y: this.player.y
+    //   }
     // });
 
-    this.player = this.addPlayer(this.game.world.centerX, this.game.world.centerY);
+    this.player = this.createPlayer(this.game.world.centerX, this.game.world.centerY);
     this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
 
     // firebase.database().ref('players').on('child_added', (playerSnapshot: any) => {
@@ -65,7 +72,6 @@ export class Game {
   addPlatforms() {
     this.platforms = this.game.add.group();
     this.platforms.enableBody = true;
-    this.platforms.createMultiple(100, 'platform');
 
     const platformWidth = this.game.width * 0.1;
     const platformHeight = this.game.height * 0.075;
@@ -97,18 +103,14 @@ export class Game {
   }
 
   addPlatform(x: number, y: number, width: number, height: number) {
-    const platform = this.platforms.getFirstDead();
-    if (!platform) return;
-
-    platform.reset(x, y);
-    platform.scale.x = width;
-    platform.scale.y = height;
+    const platform = this.platforms.create(x, y, 'platform');
+    platform.scale.set(width, height);
     platform.body.immovable = true;
 
     return platform;
   }
 
-  addPlayer(x = 0, y = 0): Player {
+  createPlayer(x = 0, y = 0): Player {
     const player = new Player(this.game, x, this.game.height - y, 'player');
 
     this.game.add.existing(player);
@@ -131,27 +133,23 @@ export class Game {
   }
 
   readInputCommands() {
-    if (this.game.input.keyboard.isDown(Phaser.Keyboard.A)) {
+    if (this.game.input.keyboard.isDown(Game.controls.left)) {
       this.player.accelerateTo(-Player.maxVelocity);
     }
-    else if (this.game.input.keyboard.isDown(Phaser.Keyboard.D)) {
+    else if (this.game.input.keyboard.isDown(Game.controls.right)) {
       this.player.accelerateTo(Player.maxVelocity);
     }
     else {
       this.player.accelerateTo(0);
     }
 
-    if (this.game.input.keyboard.isDown(Phaser.Keyboard.SPACEBAR) && this.player.body.touching.down) {
+    if (this.game.input.keyboard.isDown(Game.controls.jump) && this.player.body.touching.down) {
       this.player.body.velocity.y = -Player.jumpSpeed;
     }
 
     // Set bounds as the player moves
     // http://codepen.io/jackrugile/pen/fqHtn
-    const playerIsMoving = (
-      this.player.body.velocity.x &&
-      !(this.player.body.touching.left || this.player.body.touching.right)
-    );
-    if (playerIsMoving) {
+    if (this.player.body.deltaX()) {
       this.game.world.setBounds(
         0, 0,
         this.player.x + this.game.width * 0.5, this.game.height

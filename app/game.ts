@@ -2,8 +2,8 @@ import { piDigits } from './pi';
 
 export class Game {
   static playerMoveSpeed = 1000;
-  static playerJumpSpeed = 800;
-  static gravity = 1000;
+  static playerJumpSpeed = 2000;
+  static gravity = 4000;
 
   static playerID = window.prompt('Enter your player ID:', '-KKFbucEljzXDLEC-49X');
   static saveCooldown = 100;

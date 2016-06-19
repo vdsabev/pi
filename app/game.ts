@@ -1,19 +1,15 @@
 import { piDigits } from './pi';
+import { Player } from './player';
 
 export class Game {
-  static playerMaxVelocity = 1000;
-  static playerAcceleration = Game.playerMaxVelocity * 0.2;
-  static playerJumpSpeed = 2000;
-  static gravity = 4000;
-
   static playerID = window.prompt('Enter your player ID:', '-KKFbucEljzXDLEC-49X');
   static saveCooldown = 100;
 
   game: Phaser.Game;
   initialWidth: number;
   initialHeight: number;
-  player: Phaser.Sprite;
-  otherPlayers: Phaser.Sprite[] = [];
+  player: Player;
+  otherPlayers: Player[] = [];
   platforms: Phaser.Group;
 
   savePlayerPosition = _.throttle(() => {
@@ -110,16 +106,8 @@ export class Game {
     return platform;
   }
 
-  addPlayer(x = 0, y = 0) {
-    const player = this.game.add.sprite(x, this.game.height - y, 'player');
-    player.scale.set(this.game.height * 0.1 / player.height);
-    player.anchor.set(0.5);
-
-    this.game.physics.arcade.enable(player);
-    player.body.gravity.y = Game.gravity;
-    player.body.collideWorldBounds = true;
-
-    return player;
+  addPlayer(x = 0, y = 0): Player {
+    return new Player(this.game, x, this.game.height - y, 'player');
   }
 
   update() {
@@ -135,17 +123,17 @@ export class Game {
 
   readInputCommands() {
     if (this.game.input.keyboard.isDown(Phaser.Keyboard.A)) {
-      this.accelerateTo(-Game.playerMaxVelocity);
+      this.player.accelerateTo(-Player.maxVelocity);
     }
     else if (this.game.input.keyboard.isDown(Phaser.Keyboard.D)) {
-      this.accelerateTo(Game.playerMaxVelocity);
+      this.player.accelerateTo(Player.maxVelocity);
     }
     else {
-      this.accelerateTo(0);
+      this.player.accelerateTo(0);
     }
 
     if (this.game.input.keyboard.isDown(Phaser.Keyboard.SPACEBAR) && this.player.body.touching.down) {
-      this.player.body.velocity.y = -Game.playerJumpSpeed;
+      this.player.body.velocity.y = -Player.jumpSpeed;
     }
 
     // Set bounds as the player moves
@@ -160,27 +148,6 @@ export class Game {
         this.player.x + this.game.width * 0.5, this.game.height
       );
       this.savePlayerPosition();
-    }
-  }
-
-  accelerateTo(finalVelocity: number) {
-    if (finalVelocity < 0) { // Accelerate left
-      if (-Game.playerMaxVelocity < this.player.body.velocity.x) {
-        this.player.body.velocity.x -= Game.playerAcceleration;
-      }
-    }
-    else if (0 < finalVelocity) { // Accelerate right
-      if (this.player.body.velocity.x < Game.playerMaxVelocity) {
-        this.player.body.velocity.x += Game.playerAcceleration;
-      }
-    }
-    else { // Stop movement
-      if (this.player.body.velocity.x < 0) {
-        this.player.body.velocity.x += Game.playerAcceleration;
-      }
-      else if (0 < this.player.body.velocity.x) {
-        this.player.body.velocity.x -= Game.playerAcceleration;
-      }
     }
   }
 

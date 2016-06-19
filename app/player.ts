@@ -9,11 +9,6 @@ export class Player extends Phaser.Sprite {
 
     this.scale.set(game.height * 0.1 / this.height);
     this.anchor.set(0.5);
-
-    game.add.existing(this);
-    game.physics.arcade.enable(this);
-    this.body.gravity.y = Player.gravity;
-    this.body.collideWorldBounds = true;
   }
 
   accelerateTo(finalVelocity: number) {

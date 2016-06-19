@@ -28,8 +28,10 @@ export class Game {
   }
 
   create() {
-    this.game.world.setBounds(0, 0, this.game.width, this.game.height);
     this.game.physics.startSystem(Phaser.Physics.ARCADE);
+    this.game.time.advancedTiming = true;
+    this.game.world.setBounds(0, 0, this.game.width, this.game.height);
+
     this.addPlatforms();
 
     // TODO: Create player when registering
@@ -107,7 +109,14 @@ export class Game {
   }
 
   addPlayer(x = 0, y = 0): Player {
-    return new Player(this.game, x, this.game.height - y, 'player');
+    const player = new Player(this.game, x, this.game.height - y, 'player');
+
+    this.game.add.existing(player);
+    this.game.physics.arcade.enable(player);
+    player.body.gravity.y = Player.gravity;
+    player.body.collideWorldBounds = true;
+
+    return player;
   }
 
   update() {
@@ -152,6 +161,7 @@ export class Game {
   }
 
   render() {
-    this.game.debug.cameraInfo(this.game.camera, 32, 32);
+    this.game.debug.text(`${this.game.time.fps} FPS`, 32, 32);
+    this.game.debug.cameraInfo(this.game.camera, 32, 48);
   }
 }

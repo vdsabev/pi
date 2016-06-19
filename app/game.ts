@@ -1,7 +1,8 @@
 import { piDigits } from './pi';
 
 export class Game {
-  static playerMoveSpeed = 1000;
+  static playerMaxVelocity = 1000;
+  static playerAcceleration = Game.playerMaxVelocity * 0.2;
   static playerJumpSpeed = 2000;
   static gravity = 4000;
 
@@ -134,13 +135,13 @@ export class Game {
 
   readInputCommands() {
     if (this.game.input.keyboard.isDown(Phaser.Keyboard.A)) {
-      this.player.body.velocity.x = -Game.playerMoveSpeed;
+      this.accelerateTo(-Game.playerMaxVelocity);
     }
     else if (this.game.input.keyboard.isDown(Phaser.Keyboard.D)) {
-      this.player.body.velocity.x = Game.playerMoveSpeed;
+      this.accelerateTo(Game.playerMaxVelocity);
     }
     else {
-      this.player.body.velocity.x = 0;
+      this.accelerateTo(0);
     }
 
     if (this.game.input.keyboard.isDown(Phaser.Keyboard.SPACEBAR) && this.player.body.touching.down) {
@@ -159,6 +160,27 @@ export class Game {
         this.player.x + this.game.width * 0.5, this.game.height
       );
       this.savePlayerPosition();
+    }
+  }
+
+  accelerateTo(finalVelocity: number) {
+    if (finalVelocity < 0) { // Accelerate left
+      if (-Game.playerMaxVelocity < this.player.body.velocity.x) {
+        this.player.body.velocity.x -= Game.playerAcceleration;
+      }
+    }
+    else if (0 < finalVelocity) { // Accelerate right
+      if (this.player.body.velocity.x < Game.playerMaxVelocity) {
+        this.player.body.velocity.x += Game.playerAcceleration;
+      }
+    }
+    else { // Stop movement
+      if (this.player.body.velocity.x < 0) {
+        this.player.body.velocity.x += Game.playerAcceleration;
+      }
+      else if (0 < this.player.body.velocity.x) {
+        this.player.body.velocity.x -= Game.playerAcceleration;
+      }
     }
   }
 

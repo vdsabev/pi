@@ -97,9 +97,10 @@ export class Game {
 
     this.game.add.existing(player);
     this.game.physics.arcade.enable(player);
-    player.body.gravity.y = Game.gravity;
     player.body.collideWorldBounds = true;
-    player.body.bounce.set(0.8, 0);
+    player.body.gravity.y = Game.gravity;
+    player.body.bounce.set(0.8, 0.5);
+    player.body.drag.x = 800;
 
     return player;
   }
@@ -164,11 +165,8 @@ export class Game {
   }
 
   readShootControls() {
-    if (this.game.input.keyboard.isDown(Game.controls.shoot) && !this.player.isMoving()) {
+    if (this.game.input.keyboard.isDown(Game.controls.shoot) && this.player.body.touching.down) {
       this.player.body.velocity.set(2 * this.aim.width * Math.cos(this.aim.rotation), 2 * this.aim.width * Math.sin(this.aim.rotation));
-    }
-    else if (this.player.body.touching.down) {
-      this.player.body.velocity.x = 0;
     }
   }
 

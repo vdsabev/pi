@@ -1,21 +1,26 @@
+import { Aim } from './aim';
 import { piDigits } from './pi';
 import { Player } from './player';
 
 export class Game {
+  static gravity = 4000;
   static playerID = window.prompt('Enter your player ID:', '-KKFbucEljzXDLEC-49X');
   static saveCooldown = 100;
   static controls = {
-    jump: Phaser.Keyboard.SPACEBAR,
-    left: Phaser.Keyboard.A,
-    right: Phaser.Keyboard.D
+    decreaseAimSize: Phaser.Keyboard.S,
+    increaseAimSize: Phaser.Keyboard.W,
+    rotateAimLeft: Phaser.Keyboard.A,
+    rotateAimRight: Phaser.Keyboard.D,
+    shoot: Phaser.Keyboard.SPACEBAR
   };
 
   game: Phaser.Game;
   initialWidth: number;
   initialHeight: number;
+  platforms: Phaser.Group;
   player: Player;
   otherPlayers: Player[] = [];
-  platforms: Phaser.Group;
+  aim: Phaser.Sprite;
 
   savePlayerPosition = _.throttle(() => {
     firebase.database()
@@ -39,41 +44,18 @@ export class Game {
 
     this.addPlatforms();
 
-    // TODO: Create player when registering
-    // this.player = this.addPlayer(this.game.world.centerX, this.game.world.centerY);
-    // firebase.database().ref('players').push({
-    //   position: {
-    //     x: this.player.x,
-    //     y: this.player.y
-    //   }
-    // });
-
     this.player = this.createPlayer(this.game.world.centerX, this.game.world.centerY);
     this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
+    this.aim = new Aim(this.player);
 
-    // firebase.database().ref('players').on('child_added', (playerSnapshot: any) => {
-    //   const position = playerSnapshot.val().position;
-    //   const player = this.addPlayer(position.x, position.y);
-    //   if (playerSnapshot.key === Game.playerID) {
-    //     this.player = player;
-    //     this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
-    //   }
-    //   else {
-    //     this.otherPlayers.push(player);
-    //     firebase.database()
-    //       .ref(`players/${playerSnapshot.key}/position`)
-    //       .on('child_changed', (positionSnapshot: any) => {
-    //         (player as any)[positionSnapshot.key] = positionSnapshot.val();
-    //       });
-    //   }
-    // });
+    // this.getOnlinePlayers();
   }
 
   addPlatforms() {
     this.platforms = this.game.add.group();
     this.platforms.enableBody = true;
 
-    const platformWidth = this.game.width * 0.1;
+    const platformWidth = 200;
     const platformHeight = this.game.height * 0.075;
 
     // Create left wall
@@ -111,20 +93,40 @@ export class Game {
   }
 
   createPlayer(x = 0, y = 0): Player {
-    const player = new Player(this.game, x, this.game.height - y, 'player');
+    const player = new Player(this.game, x, this.game.height - y);
 
     this.game.add.existing(player);
     this.game.physics.arcade.enable(player);
-    player.body.gravity.y = Player.gravity;
+    player.body.gravity.y = Game.gravity;
     player.body.collideWorldBounds = true;
+    player.body.bounce.set(0.8, 0);
 
     return player;
+  }
+
+  getOnlinePlayers() {
+    firebase.database().ref('players').on('child_added', (playerSnapshot: any) => {
+      const position = playerSnapshot.val().position;
+      const player = this.createPlayer(position.x, position.y);
+      if (playerSnapshot.key === Game.playerID) {
+        this.player = player;
+        this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
+      }
+      else {
+        this.otherPlayers.push(player);
+        firebase.database()
+          .ref(`players/${playerSnapshot.key}/position`)
+          .on('child_changed', (positionSnapshot: any) => {
+            (player as any)[positionSnapshot.key] = positionSnapshot.val();
+          });
+      }
+    });
   }
 
   update() {
     if (this.player) {
       this.game.physics.arcade.collide(this.player, this.platforms);
-      this.readInputCommands();
+      this.readInputControls();
     }
 
     _(this.otherPlayers).forEach((player) => {
@@ -132,30 +134,51 @@ export class Game {
     });
   }
 
-  readInputCommands() {
-    if (this.game.input.keyboard.isDown(Game.controls.left)) {
-      this.player.accelerateTo(-Player.maxVelocity);
-    }
-    else if (this.game.input.keyboard.isDown(Game.controls.right)) {
-      this.player.accelerateTo(Player.maxVelocity);
-    }
-    else {
-      this.player.accelerateTo(0);
-    }
+  readInputControls() {
+    this.readAimRotationControls();
+    this.readAimSizeControls();
+    this.readShootControls();
 
-    if (this.game.input.keyboard.isDown(Game.controls.jump) && this.player.body.touching.down) {
-      this.player.body.velocity.y = -Player.jumpSpeed;
-    }
-
-    // Set bounds as the player moves
-    // http://codepen.io/jackrugile/pen/fqHtn
     if (this.player.body.deltaX()) {
-      this.game.world.setBounds(
-        0, 0,
-        this.player.x + this.game.width * 0.5, this.game.height
-      );
-      this.savePlayerPosition();
+      this.followPlayer();
+      // this.savePlayerPosition();
     }
+  }
+
+  readAimSizeControls() {
+    if (this.game.input.keyboard.isDown(Game.controls.increaseAimSize)) {
+      this.aim.scale.x += 15;
+    }
+    else if (this.game.input.keyboard.isDown(Game.controls.decreaseAimSize)) {
+      this.aim.scale.x -= 15;
+    }
+  }
+
+  readAimRotationControls() {
+    if (this.game.input.keyboard.isDown(Game.controls.rotateAimLeft)) {
+      this.aim.rotation -= 0.05;
+    }
+    else if (this.game.input.keyboard.isDown(Game.controls.rotateAimRight)) {
+      this.aim.rotation += 0.05;
+    }
+  }
+
+  readShootControls() {
+    if (this.game.input.keyboard.isDown(Game.controls.shoot) && !this.player.isMoving()) {
+      this.player.body.velocity.set(2 * this.aim.width * Math.cos(this.aim.rotation), 2 * this.aim.width * Math.sin(this.aim.rotation));
+    }
+    else if (this.player.body.touching.down) {
+      this.player.body.velocity.x = 0;
+    }
+  }
+
+  // Set bounds as the player moves
+  // http://codepen.io/jackrugile/pen/fqHtn
+  followPlayer() {
+    this.game.world.setBounds(
+      0, 0,
+      this.player.x + this.game.width * 0.5, this.game.height
+    );
   }
 
   render() {

@@ -13,7 +13,10 @@ module.exports = {
   },
 
   plugins: [
-    new HtmlWebpackPlugin({ title: 'Journey Through Pi' }),
+    new HtmlWebpackPlugin({
+      template: './app/index.ejs', // Load a custom template
+      inject: 'body' // Inject all scripts into the body
+    }),
     new webpack.optimize.CommonsChunkPlugin('vendor', 'vendor.bundle.js'),
     new ExtractTextPlugin('style.css')
   ],

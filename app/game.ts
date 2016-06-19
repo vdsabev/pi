@@ -1,26 +1,15 @@
-import { Aim } from './aim';
 import { piDigits } from './pi';
 import { Player } from './player';
 
 export class Game {
-  static gravity = 4000;
+  static gravity = 5000;
   static playerID = window.prompt('Enter your player ID:', '-KKFbucEljzXDLEC-49X');
   static saveCooldown = 100;
-  static controls = {
-    decreaseAimSize: Phaser.Keyboard.S,
-    increaseAimSize: Phaser.Keyboard.W,
-    rotateAimLeft: Phaser.Keyboard.A,
-    rotateAimRight: Phaser.Keyboard.D,
-    shoot: Phaser.Keyboard.SPACEBAR
-  };
 
   game: Phaser.Game;
-  initialWidth: number;
-  initialHeight: number;
   platforms: Phaser.Group;
   player: Player;
   otherPlayers: Player[] = [];
-  aim: Phaser.Sprite;
 
   savePlayerPosition = _.throttle(() => {
     firebase.database()
@@ -46,7 +35,6 @@ export class Game {
 
     this.player = this.createPlayer(this.game.world.centerX, this.game.world.centerY);
     this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
-    this.aim = new Aim(this.player);
 
     // this.getOnlinePlayers();
   }
@@ -99,7 +87,7 @@ export class Game {
     this.game.physics.arcade.enable(player);
     player.body.collideWorldBounds = true;
     player.body.gravity.y = Game.gravity;
-    player.body.bounce.set(0.8, 0.5);
+    player.body.bounce.set(0.75, 0.5);
     player.body.drag.x = 800;
 
     return player;
@@ -136,37 +124,14 @@ export class Game {
   }
 
   readInputControls() {
-    this.readAimRotationControls();
-    this.readAimSizeControls();
-    this.readShootControls();
+    if (this.game.input.mousePointer.isDown && this.player.body.touching.down) {
+      const distance = this.game.physics.arcade.distanceToPointer(this.player);
+      this.game.physics.arcade.moveToPointer(this.player, 100 * Math.sqrt(distance)); // MAGIC
+    }
 
     if (this.player.body.deltaX()) {
       this.followPlayer();
       // this.savePlayerPosition();
-    }
-  }
-
-  readAimSizeControls() {
-    if (this.game.input.keyboard.isDown(Game.controls.increaseAimSize)) {
-      this.aim.scale.x += 15;
-    }
-    else if (this.game.input.keyboard.isDown(Game.controls.decreaseAimSize)) {
-      this.aim.scale.x -= 15;
-    }
-  }
-
-  readAimRotationControls() {
-    if (this.game.input.keyboard.isDown(Game.controls.rotateAimLeft)) {
-      this.aim.rotation -= 0.05;
-    }
-    else if (this.game.input.keyboard.isDown(Game.controls.rotateAimRight)) {
-      this.aim.rotation += 0.05;
-    }
-  }
-
-  readShootControls() {
-    if (this.game.input.keyboard.isDown(Game.controls.shoot) && this.player.body.touching.down) {
-      this.player.body.velocity.set(2 * this.aim.width * Math.cos(this.aim.rotation), 2 * this.aim.width * Math.sin(this.aim.rotation));
     }
   }
 

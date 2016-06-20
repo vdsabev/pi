@@ -1,75 +1,76 @@
 import { piDigits } from './pi';
 import { Player } from './player';
+import { Unit } from './unit';
 
 export class Game {
-  private static playerID = window.prompt('Enter your player ID:', '-KKFbucEljzXDLEC-49X');
-
   private game: Phaser.Game;
-  private platforms: Phaser.Group;
-  private player: Player;
   private otherPlayers: Player[] = [];
+  private player: Player;
+  private playerID = window.prompt('Enter your player ID:', '-KKFbucEljzXDLEC-49X');
+  private tiles: Phaser.Group;
 
   preload() {
     this.game.stage.backgroundColor = 0x000000;
-    this.game.load.image('platform', 'assets/sprites/platform.png');
     this.game.load.image('player', 'assets/sprites/player.png');
+    this.game.load.image('tile', 'assets/sprites/tile.png');
   }
 
   create() {
+    Unit.value = this.game.height / Unit.total;
+    Unit.inverseValue = Unit.total / this.game.height;
+
     this.game.physics.startSystem(Phaser.Physics.ARCADE);
     this.game.time.advancedTiming = true;
     this.game.world.setBounds(0, 0, this.game.width, this.game.height);
 
     this.watchOnlinePlayers();
-    this.addPlatforms();
+    this.addTiles();
   }
 
-  addPlatforms() {
-    this.platforms = this.game.add.group();
-    this.platforms.enableBody = true;
-
-    const platformWidth = 200;
-    const platformHeight = this.game.height * 0.075;
+  addTiles() {
+    this.tiles = this.game.add.group();
+    this.tiles.enableBody = true;
 
     // Create left wall
-    this.addPlatform(
-      0, 0,
-      platformHeight, this.game.height
+    this.addTile(
+      -this.game.width * 0.5, 0,
+      this.game.width * 0.5 + Unit.value, this.game.height
     );
 
     // Create floor
-    this.addPlatform(
-      0, this.game.height - platformHeight,
+    this.addTile(
+      0, this.game.height - Unit.value,
       this.game.width,
-      platformHeight
+      Unit.value
     );
 
     // Create ceiling
-    this.addPlatform(0, 0, 10 * this.game.width, platformHeight);
+    this.addTile(0, 0, this.game.width + 1000 * Unit.value, Unit.value);
 
     // Create digits
-    _(100).times((index) => {
+    _(1000).times((index) => {
       const offsetDigit = piDigits[index] + 1;
-      this.addPlatform(
-        this.game.width + index * platformWidth, this.game.height - offsetDigit * platformHeight,
-        platformWidth, offsetDigit * platformHeight
+      this.addTile(
+        this.game.width + index * Unit.value, this.game.height - offsetDigit * Unit.value,
+        Unit.value, offsetDigit * Unit.value
       );
     });
   }
 
-  addPlatform(x: number, y: number, width: number, height: number) {
-    const platform = this.platforms.create(x, y, 'platform');
-    platform.scale.set(width, height);
-    platform.body.immovable = true;
+  addTile(x: number, y: number, width: number, height: number) {
+    const tile = this.tiles.create(x, y, 'tile');
+    tile.scale.set(width, height);
+    tile.body.immovable = true;
 
-    return platform;
+    return tile;
   }
 
   watchOnlinePlayers() {
     firebase.database().ref('players').on('child_added', (playerSnapshot: any) => {
       const playerVal = playerSnapshot.val();
-      const player = this.createPlayer(playerVal.move.x, playerVal.move.y, playerSnapshot.key);
-      if (player.id === Game.playerID) {
+      const position: Phaser.Pointer = playerVal.position || { x: 1, y: 1 };
+      const player = this.createPlayer(position.x, position.y, playerSnapshot.key);
+      if (player.id === this.playerID) {
         this.player = player;
         this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
       }
@@ -87,12 +88,12 @@ export class Game {
 
   update() {
     if (this.player) {
-      this.game.physics.arcade.collide(this.player, this.platforms);
+      this.game.physics.arcade.collide(this.player, this.tiles);
       this.readInputControls();
     }
 
     _(this.otherPlayers).forEach((player) => {
-      this.game.physics.arcade.collide(player, this.platforms);
+      this.game.physics.arcade.collide(player, this.tiles);
     });
   }
 
@@ -104,17 +105,12 @@ export class Game {
     }
 
     if (this.player.body.deltaX()) {
-      this.followPlayer();
+      this.player.follow();
     }
-  }
 
-  // Set bounds as the player moves
-  // http://codepen.io/jackrugile/pen/fqHtn
-  followPlayer() {
-    this.game.world.setBounds(
-      0, 0,
-      this.player.x + this.game.width * 0.5, this.game.height
-    );
+    if (this.player.isMoving()) {
+      this.player.savePosition();
+    }
   }
 
   render() {

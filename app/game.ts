@@ -2,23 +2,12 @@ import { piDigits } from './pi';
 import { Player } from './player';
 
 export class Game {
-  static gravity = 5000;
-  static playerID = window.prompt('Enter your player ID:', '-KKFbucEljzXDLEC-49X');
-  static saveCooldown = 100;
+  private static playerID = window.prompt('Enter your player ID:', '-KKFbucEljzXDLEC-49X');
 
-  game: Phaser.Game;
-  platforms: Phaser.Group;
-  player: Player;
-  otherPlayers: Player[] = [];
-
-  savePlayerPosition = _.throttle(() => {
-    firebase.database()
-      .ref(`players/${Game.playerID}/position`)
-      .set({
-        x: this.player.x,
-        y: this.game.height - this.player.y
-      });
-  }, Game.saveCooldown);
+  private game: Phaser.Game;
+  private platforms: Phaser.Group;
+  private player: Player;
+  private otherPlayers: Player[] = [];
 
   preload() {
     this.game.stage.backgroundColor = 0x000000;
@@ -31,12 +20,8 @@ export class Game {
     this.game.time.advancedTiming = true;
     this.game.world.setBounds(0, 0, this.game.width, this.game.height);
 
+    this.watchOnlinePlayers();
     this.addPlatforms();
-
-    this.player = this.createPlayer(this.game.world.centerX, this.game.world.centerY);
-    this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
-
-    // this.getOnlinePlayers();
   }
 
   addPlatforms() {
@@ -80,36 +65,24 @@ export class Game {
     return platform;
   }
 
-  createPlayer(x = 0, y = 0): Player {
-    const player = new Player(this.game, x, this.game.height - y);
-
-    this.game.add.existing(player);
-    this.game.physics.arcade.enable(player);
-    player.body.collideWorldBounds = true;
-    player.body.gravity.y = Game.gravity;
-    player.body.bounce.set(0.75, 0.5);
-    player.body.drag.x = 800;
-
-    return player;
-  }
-
-  getOnlinePlayers() {
+  watchOnlinePlayers() {
     firebase.database().ref('players').on('child_added', (playerSnapshot: any) => {
-      const position = playerSnapshot.val().position;
-      const player = this.createPlayer(position.x, position.y);
-      if (playerSnapshot.key === Game.playerID) {
+      const playerVal = playerSnapshot.val();
+      const player = this.createPlayer(playerVal.move.x, playerVal.move.y, playerSnapshot.key);
+      if (player.id === Game.playerID) {
         this.player = player;
         this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
       }
       else {
         this.otherPlayers.push(player);
-        firebase.database()
-          .ref(`players/${playerSnapshot.key}/position`)
-          .on('child_changed', (positionSnapshot: any) => {
-            (player as any)[positionSnapshot.key] = positionSnapshot.val();
-          });
+        player.watchMoves();
       }
     });
+  }
+
+  createPlayer(x = this.game.width * 0.5, y = this.game.height * 0.5, id: string): Player {
+    const player = new Player(this.game, x, this.game.height - y, id);
+    return player;
   }
 
   update() {
@@ -125,13 +98,13 @@ export class Game {
 
   readInputControls() {
     if (this.game.input.mousePointer.isDown && this.player.body.touching.down) {
-      const distance = this.game.physics.arcade.distanceToPointer(this.player);
-      this.game.physics.arcade.moveToPointer(this.player, 100 * Math.sqrt(distance)); // MAGIC
+      const move = this.player.move();
+      this.player.saveMove(move);
+      // TODO: Save position once movement has stopped
     }
 
     if (this.player.body.deltaX()) {
       this.followPlayer();
-      // this.savePlayerPosition();
     }
   }
 

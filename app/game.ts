@@ -3,6 +3,13 @@ import { Player } from './player';
 import { Unit } from './unit';
 
 export class Game {
+  private static controls = {
+    crouch: Phaser.Keyboard.S,
+    jump: Phaser.Keyboard.SPACEBAR,
+    left: Phaser.Keyboard.A,
+    right: Phaser.Keyboard.D
+  };
+
   private game: Phaser.Game;
   private otherPlayers: Player[] = [];
   private player: Player;
@@ -21,7 +28,6 @@ export class Game {
 
     this.game.physics.startSystem(Phaser.Physics.ARCADE);
     this.game.time.advancedTiming = true;
-    this.game.world.setBounds(0, 0, this.game.width, this.game.height);
 
     this.watchOnlinePlayers();
     this.addTiles();
@@ -72,11 +78,13 @@ export class Game {
       const player = this.createPlayer(position.x, position.y, playerSnapshot.key);
       if (player.id === this.playerID) {
         this.player = player;
+        this.player.body.collideWorldBounds = true;
         this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
+        this.player.centerCamera();
       }
       else {
         this.otherPlayers.push(player);
-        player.watchMoves();
+        player.watchPosition();
       }
     });
   }
@@ -98,17 +106,38 @@ export class Game {
   }
 
   readInputControls() {
-    if (this.game.input.mousePointer.isDown && this.player.body.touching.down) {
-      const move = this.player.move();
-      this.player.saveMove(move);
-      // TODO: Save position once movement has stopped
+    if (this.game.input.keyboard.isDown(Game.controls.crouch)) {
+      this.player.crouch();
+    }
+    else {
+      this.player.stand();
+    }
+
+    if (this.game.input.keyboard.isDown(Game.controls.left)) {
+      this.player.moveLeft();
+    }
+    else if (this.game.input.keyboard.isDown(Game.controls.right)) {
+      this.player.moveRight();
+    }
+    else {
+      this.player.stop();
+    }
+
+    if (this.game.input.keyboard.isDown(Game.controls.jump)) {
+      if (this.player.canJump()) {
+        this.player.jump();
+      }
+      else if (this.player.canDoubleJump()) {
+        this.player.doubleJump();
+      }
+      this.player.isPressingJump = true;
+    }
+    else {
+      this.player.isPressingJump = false;
     }
 
     if (this.player.body.deltaX()) {
-      this.player.follow();
-    }
-
-    if (this.player.isMoving()) {
+      this.player.centerCamera();
       this.player.savePosition();
     }
   }

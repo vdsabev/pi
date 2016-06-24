@@ -3,6 +3,11 @@
 
 declare var firebase: any;
 
+interface FirebaseSnapshot {
+  key: string;
+  val(): any;
+}
+
 // Type declarations for Webpack runtime
 // https://github.com/defaude/awesome-typescript-loader/blob/64a7ff77747c3dd452d3362c03a2965a11dc63ed/lib/runtime.d.ts
 interface WebpackRequire {

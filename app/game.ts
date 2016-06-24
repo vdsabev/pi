@@ -11,7 +11,7 @@ export class Game {
   };
 
   private game: Phaser.Game;
-  private otherPlayers: Player[] = [];
+  private onlinePlayers: Player[] = [];
   private player: Player;
   private playerID = window.prompt('Enter your player ID:', '-KKFbucEljzXDLEC-49X');
   private tiles: Phaser.Group;
@@ -23,9 +23,11 @@ export class Game {
   }
 
   create() {
+    // Unit.value = Unit.world / Unit.total;
     Unit.value = this.game.height / Unit.total;
     Unit.inverseValue = Unit.total / this.game.height;
 
+    // this.game.world.scale.set(this.game.height / Unit.world);
     this.game.physics.startSystem(Phaser.Physics.ARCADE);
     this.game.time.advancedTiming = true;
 
@@ -72,21 +74,30 @@ export class Game {
   }
 
   watchOnlinePlayers() {
-    firebase.database().ref('players').on('child_added', (playerSnapshot: any) => {
-      const playerVal = playerSnapshot.val();
-      const position: Phaser.Pointer = playerVal.position || { x: 1, y: 1 };
-      const player = this.createPlayer(position.x, position.y, playerSnapshot.key);
-      if (player.id === this.playerID) {
-        this.player = player;
-        this.player.body.collideWorldBounds = true;
-        this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
-        this.player.centerCamera();
-      }
-      else {
-        this.otherPlayers.push(player);
-        player.watchPosition();
-      }
-    });
+    firebase.database()
+      .ref('players')
+      .on('child_added', (playerSnapshot: FirebaseSnapshot) => {
+        const playerVal = playerSnapshot.val();
+        const position: Phaser.Pointer = playerVal.position || { x: 1, y: 1 };
+        const player = this.createPlayer(position.x, position.y, playerSnapshot.key);
+        if (player.id === this.playerID) {
+          this.player = player;
+          this.player.body.collideWorldBounds = true;
+          this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
+          this.player.centerCamera();
+        }
+
+        if (playerVal.uuid !== this.player.uuid) {
+          this.onlinePlayers.push(player);
+          player.watchPosition(() => {
+            // Update the current player's position to avoid "teleportation"
+            // if a player logs in with the same account
+            if (playerSnapshot.key === this.playerID) {
+              this.player.centerCamera();
+            }
+          });
+        }
+      });
   }
 
   createPlayer(x = this.game.width * 0.5, y = this.game.height * 0.5, id: string): Player {
@@ -100,7 +111,7 @@ export class Game {
       this.readInputControls();
     }
 
-    _(this.otherPlayers).forEach((player) => {
+    _(this.onlinePlayers).forEach((player) => {
       this.game.physics.arcade.collide(player, this.tiles);
     });
   }
@@ -138,6 +149,9 @@ export class Game {
 
     if (this.player.body.deltaX()) {
       this.player.centerCamera();
+    }
+
+    if (this.player.body.deltaX() || this.player.body.deltaY()) {
       this.player.savePosition();
     }
   }

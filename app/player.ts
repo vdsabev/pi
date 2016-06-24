@@ -1,4 +1,5 @@
 import { Unit } from './unit';
+import { uuid } from './uuid';
 
 export class Player extends Phaser.Sprite {
   private static maxVelocity = 1000;
@@ -14,11 +15,17 @@ export class Player extends Phaser.Sprite {
   private static saveCooldown = 100;
 
   savePosition = _.throttle(() => {
-    firebase.database().ref(`players/${this.id}/position`).set({
-      x: this.x,
-      y: this.game.height - this.y
-    });
+    firebase.database()
+      .ref(`players/${this.id}`)
+      .update({
+        position: {
+          x: this.x,
+          y: this.game.height - this.y
+        },
+        uuid: this.uuid
+      });
   }, Player.saveCooldown);
+  uuid: string;
 
   isPressingJump: boolean;
   private doubleJumpingAllowed: boolean;
@@ -36,6 +43,8 @@ export class Player extends Phaser.Sprite {
     this.game.add.existing(this);
     this.game.physics.arcade.enable(this);
     this.body.gravity.y = Player.gravity;
+
+    this.uuid = uuid();
   }
 
   // Set bounds as the player moves
@@ -107,11 +116,25 @@ export class Player extends Phaser.Sprite {
     this.doubleJumpingAllowed = false;
   }
 
-  watchPosition() {
+  watchPosition(callback?: Function) {
     firebase.database()
       .ref(`players/${this.id}/position`)
-      .on('child_changed', (positionSnapshot: any) => {
-        this[positionSnapshot.key] = positionSnapshot.val();
+      .on('child_changed', (positionChildSnapshot: FirebaseSnapshot) => {
+        const position = { x: this.x, y: this.y };
+        switch (positionChildSnapshot.key) {
+          case 'x':
+            position.x = positionChildSnapshot.val();
+            break;
+          case 'y':
+            position.y = this.game.height - positionChildSnapshot.val();
+            break;
+        }
+
+        this.game.add.tween(this.position).to(position, 100, Phaser.Easing.Linear.None, true);
+
+        if (callback) {
+          callback();
+        }
       });
   }
 }

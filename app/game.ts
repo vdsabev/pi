@@ -1,147 +1,159 @@
 import { piDigits } from './pi';
 import { Player } from './player';
+import { Unit } from './unit';
 
 export class Game {
-  static gravity = 5000;
-  static playerID = window.prompt('Enter your player ID:', '-KKFbucEljzXDLEC-49X');
-  static saveCooldown = 100;
+  private static controls = {
+    crouch: Phaser.Keyboard.S,
+    jump: Phaser.Keyboard.SPACEBAR,
+    left: Phaser.Keyboard.A,
+    right: Phaser.Keyboard.D
+  };
 
-  game: Phaser.Game;
-  platforms: Phaser.Group;
-  player: Player;
-  otherPlayers: Player[] = [];
-
-  savePlayerPosition = _.throttle(() => {
-    firebase.database()
-      .ref(`players/${Game.playerID}/position`)
-      .set({
-        x: this.player.x,
-        y: this.game.height - this.player.y
-      });
-  }, Game.saveCooldown);
+  private game: Phaser.Game;
+  private onlinePlayers: Player[] = [];
+  private player: Player;
+  private playerID = window.prompt('Enter your player ID:', '-KKFbucEljzXDLEC-49X');
+  private tiles: Phaser.Group;
 
   preload() {
     this.game.stage.backgroundColor = 0x000000;
-    this.game.load.image('platform', 'assets/sprites/platform.png');
     this.game.load.image('player', 'assets/sprites/player.png');
+    this.game.load.image('tile', 'assets/sprites/tile.png');
   }
 
   create() {
+    // Unit.value = Unit.world / Unit.total;
+    Unit.value = this.game.height / Unit.total;
+    Unit.inverseValue = Unit.total / this.game.height;
+
+    // this.game.world.scale.set(this.game.height / Unit.world);
     this.game.physics.startSystem(Phaser.Physics.ARCADE);
     this.game.time.advancedTiming = true;
-    this.game.world.setBounds(0, 0, this.game.width, this.game.height);
 
-    this.addPlatforms();
-
-    this.player = this.createPlayer(this.game.world.centerX, this.game.world.centerY);
-    this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
-
-    // this.getOnlinePlayers();
+    this.watchOnlinePlayers();
+    this.addTiles();
   }
 
-  addPlatforms() {
-    this.platforms = this.game.add.group();
-    this.platforms.enableBody = true;
-
-    const platformWidth = 200;
-    const platformHeight = this.game.height * 0.075;
+  addTiles() {
+    this.tiles = this.game.add.group();
+    this.tiles.enableBody = true;
 
     // Create left wall
-    this.addPlatform(
-      0, 0,
-      platformHeight, this.game.height
+    this.addTile(
+      -this.game.width * 0.5, 0,
+      this.game.width * 0.5 + Unit.value, this.game.height
     );
 
     // Create floor
-    this.addPlatform(
-      0, this.game.height - platformHeight,
+    this.addTile(
+      0, this.game.height - Unit.value,
       this.game.width,
-      platformHeight
+      Unit.value
     );
 
     // Create ceiling
-    this.addPlatform(0, 0, 10 * this.game.width, platformHeight);
+    this.addTile(0, 0, this.game.width + 1000 * Unit.value, Unit.value);
 
     // Create digits
-    _(100).times((index) => {
+    _(1000).times((index) => {
       const offsetDigit = piDigits[index] + 1;
-      this.addPlatform(
-        this.game.width + index * platformWidth, this.game.height - offsetDigit * platformHeight,
-        platformWidth, offsetDigit * platformHeight
+      this.addTile(
+        this.game.width + index * Unit.value, this.game.height - offsetDigit * Unit.value,
+        Unit.value, offsetDigit * Unit.value
       );
     });
   }
 
-  addPlatform(x: number, y: number, width: number, height: number) {
-    const platform = this.platforms.create(x, y, 'platform');
-    platform.scale.set(width, height);
-    platform.body.immovable = true;
+  addTile(x: number, y: number, width: number, height: number) {
+    const tile = this.tiles.create(x, y, 'tile');
+    tile.scale.set(width, height);
+    tile.body.immovable = true;
 
-    return platform;
+    return tile;
   }
 
-  createPlayer(x = 0, y = 0): Player {
-    const player = new Player(this.game, x, this.game.height - y);
+  watchOnlinePlayers() {
+    firebase.database()
+      .ref('players')
+      .on('child_added', (playerSnapshot: FirebaseSnapshot) => {
+        const playerVal = playerSnapshot.val();
+        const position: Phaser.Pointer = playerVal.position || { x: 1, y: 1 };
+        const player = this.createPlayer(position.x, position.y, playerSnapshot.key);
+        if (player.id === this.playerID) {
+          this.player = player;
+          this.player.body.collideWorldBounds = true;
+          this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
+          this.player.centerCamera();
+        }
 
-    this.game.add.existing(player);
-    this.game.physics.arcade.enable(player);
-    player.body.collideWorldBounds = true;
-    player.body.gravity.y = Game.gravity;
-    player.body.bounce.set(0.75, 0.5);
-    player.body.drag.x = 800;
-
-    return player;
-  }
-
-  getOnlinePlayers() {
-    firebase.database().ref('players').on('child_added', (playerSnapshot: any) => {
-      const position = playerSnapshot.val().position;
-      const player = this.createPlayer(position.x, position.y);
-      if (playerSnapshot.key === Game.playerID) {
-        this.player = player;
-        this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON);
-      }
-      else {
-        this.otherPlayers.push(player);
-        firebase.database()
-          .ref(`players/${playerSnapshot.key}/position`)
-          .on('child_changed', (positionSnapshot: any) => {
-            (player as any)[positionSnapshot.key] = positionSnapshot.val();
+        if (playerVal.uuid !== this.player.uuid) {
+          this.onlinePlayers.push(player);
+          player.watchPosition(() => {
+            // Update the current player's position to avoid "teleportation"
+            // if a player logs in with the same account
+            if (playerSnapshot.key === this.playerID) {
+              this.player.centerCamera();
+            }
           });
-      }
-    });
+        }
+      });
+  }
+
+  createPlayer(x = this.game.width * 0.5, y = this.game.height * 0.5, id: string): Player {
+    const player = new Player(this.game, x, this.game.height - y, id);
+    return player;
   }
 
   update() {
     if (this.player) {
-      this.game.physics.arcade.collide(this.player, this.platforms);
+      this.game.physics.arcade.collide(this.player, this.tiles);
       this.readInputControls();
     }
 
-    _(this.otherPlayers).forEach((player) => {
-      this.game.physics.arcade.collide(player, this.platforms);
+    _(this.onlinePlayers).forEach((player) => {
+      this.game.physics.arcade.collide(player, this.tiles);
     });
   }
 
   readInputControls() {
-    if (this.game.input.mousePointer.isDown && this.player.body.touching.down) {
-      const distance = this.game.physics.arcade.distanceToPointer(this.player);
-      this.game.physics.arcade.moveToPointer(this.player, 100 * Math.sqrt(distance)); // MAGIC
+    if (this.game.input.keyboard.isDown(Game.controls.crouch)) {
+      this.player.crouch();
+    }
+    else {
+      this.player.stand();
+    }
+
+    if (this.game.input.keyboard.isDown(Game.controls.left)) {
+      this.player.moveLeft();
+    }
+    else if (this.game.input.keyboard.isDown(Game.controls.right)) {
+      this.player.moveRight();
+    }
+    else {
+      this.player.stop();
+    }
+
+    if (this.game.input.keyboard.isDown(Game.controls.jump)) {
+      if (this.player.canJump()) {
+        this.player.jump();
+      }
+      else if (this.player.canDoubleJump()) {
+        this.player.doubleJump();
+      }
+      this.player.isPressingJump = true;
+    }
+    else {
+      this.player.isPressingJump = false;
     }
 
     if (this.player.body.deltaX()) {
-      this.followPlayer();
-      // this.savePlayerPosition();
+      this.player.centerCamera();
     }
-  }
 
-  // Set bounds as the player moves
-  // http://codepen.io/jackrugile/pen/fqHtn
-  followPlayer() {
-    this.game.world.setBounds(
-      0, 0,
-      this.player.x + this.game.width * 0.5, this.game.height
-    );
+    if (this.player.body.deltaX() || this.player.body.deltaY()) {
+      this.player.savePosition();
+    }
   }
 
   render() {
